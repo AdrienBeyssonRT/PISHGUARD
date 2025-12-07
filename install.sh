@@ -20,7 +20,11 @@ echo "=============================="
 echo ""
 
 # Détecter l'utilisateur qui a lancé le script
-ORIGINAL_USER=${SUDO_USER:-$USER}
+if [ -n "$SUDO_USER" ]; then
+    ORIGINAL_USER=$SUDO_USER
+else
+    ORIGINAL_USER=$(whoami)
+fi
 CURRENT_DIR=$(pwd)
 
 # Sélectionner inventaire et limite
@@ -189,12 +193,12 @@ cd "$CURRENT_DIR"
 # S'assurer que le PATH inclut pipx si nécessaire
 export PATH="$PATH:/root/.local/bin"
 
-# Construire la commande Ansible
+# Construire la commande Ansible avec variables
 ANSIBLE_CMD="ansible-playbook -i $INVENTORY"
 if [ -n "$LIMIT" ]; then
     ANSIBLE_CMD="$ANSIBLE_CMD --limit $LIMIT"
 fi
-ANSIBLE_CMD="$ANSIBLE_CMD $PLAYBOOK"
+ANSIBLE_CMD="$ANSIBLE_CMD -e ansible_user=$ORIGINAL_USER -e app_user=$ORIGINAL_USER $PLAYBOOK"
 
 # Exécuter en tant qu'utilisateur original avec le groupe docker
 if sudo -u $ORIGINAL_USER sg docker -c "cd '$CURRENT_DIR' && $ANSIBLE_CMD" 2>/dev/null; then
@@ -202,14 +206,19 @@ if sudo -u $ORIGINAL_USER sg docker -c "cd '$CURRENT_DIR' && $ANSIBLE_CMD" 2>/de
 elif sudo -u $ORIGINAL_USER bash -c "cd '$CURRENT_DIR' && $ANSIBLE_CMD" 2>/dev/null; then
     echo "✅ Déploiement réussi"
 else
-    echo ""
-    echo "⚠️  Le déploiement nécessite que le groupe docker soit actif."
-    echo "   Exécutez manuellement :"
-    echo "   newgrp docker"
-    echo "   sudo ./install.sh $ENV $ACTION"
-    echo ""
-    echo "   Ou reconnectez-vous pour que le groupe docker soit actif."
-    exit 1
+    # Dernière tentative : exécuter directement (peut fonctionner si déjà dans le groupe docker)
+    if bash -c "cd '$CURRENT_DIR' && $ANSIBLE_CMD" 2>/dev/null; then
+        echo "✅ Déploiement réussi"
+    else
+        echo ""
+        echo "⚠️  Le déploiement nécessite que le groupe docker soit actif."
+        echo "   Exécutez manuellement :"
+        echo "   newgrp docker"
+        echo "   sudo ./install.sh $ENV $ACTION"
+        echo ""
+        echo "   Ou reconnectez-vous pour que le groupe docker soit actif."
+        exit 1
+    fi
 fi
 
 echo ""
