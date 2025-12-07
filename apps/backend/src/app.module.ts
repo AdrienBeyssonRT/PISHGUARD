@@ -10,6 +10,7 @@ import { SimulationsModule } from './simulations/simulations.module';
 import { DetectionModule } from './detection/detection.module';
 import { StatsModule } from './stats/stats.module';
 import { HealthModule } from './health/health.module';
+import { JobsModule } from './jobs/jobs.module';
 import { PrismaModule } from './shared/prisma.module';
 
 @Module({
@@ -28,6 +29,7 @@ import { PrismaModule } from './shared/prisma.module';
     DetectionModule,
     StatsModule,
     HealthModule,
+    JobsModule,
   ],
 })
 export class AppModule {}

@@ -1,14 +1,14 @@
 ---
-# Inventaire pour déploiement local
-# Utilisation: ansible-playbook -i inventory/hosts.local.yml playbooks/deploy.yml
+# Inventaire pour déploiement local Ubuntu
+# Utilisation: ./deploy.sh local
 
 all:
   hosts:
     localhost:
       ansible_connection: local
+      ansible_user: "{{ ansible_env.USER }}"
       frontend_url: http://localhost:3000
       api_base_url: http://localhost:3001
       app_name: phishguard
-      app_user: "{{ ansible_user | default('root') }}"
+      app_user: "{{ ansible_env.USER }}"
       app_dir: "{{ ansible_env.HOME }}/phishguard"
-

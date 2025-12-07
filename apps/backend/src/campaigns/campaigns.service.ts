@@ -170,5 +170,30 @@ export class CampaignsService {
       take,
     };
   }
+
+  async launch(organizationId: number, id: number) {
+    const campaign = await this.prisma.campaign.findFirst({
+      where: {
+        id,
+        organizationId,
+      },
+    });
+
+    if (!campaign) {
+      throw new NotFoundException('Campaign not found');
+    }
+
+    if (campaign.status !== CampaignStatus.DRAFT) {
+      throw new Error('Campaign can only be launched from DRAFT status');
+    }
+
+    return this.prisma.campaign.update({
+      where: { id },
+      data: {
+        status: CampaignStatus.RUNNING,
+        startAt: campaign.startAt || new Date(),
+      },
+    });
+  }
 }
 

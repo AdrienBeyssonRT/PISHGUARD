@@ -1,119 +1,90 @@
 # Guide de Déploiement PhishGuard
 
-Guide complet pour déployer PhishGuard avec **une seule commande** via Ansible.
+Guide complet pour déployer PhishGuard avec **une seule commande** sur Ubuntu.
 
-## 🚀 Démarrage Rapide
+## 🚀 Installation et Déploiement Automatique
 
-### Installation
-
-```bash
-# Installer Ansible
-pip install ansible
-```
-
-### Déploiement
+### UNE SEULE COMMANDE
 
 ```bash
-# Local
-./deploy.sh local
+# Cloner le projet
+git clone https://github.com/votre-repo/phishguard.git
+cd phishguard
 
-# Production
-./deploy.sh production deploy
+# Installation et déploiement automatique
+sudo ./install.sh local
 ```
 
-**C'est tout !** Ansible installe Docker, configure tout et déploie automatiquement.
+**Le script `install.sh` fait automatiquement :**
+1. Mise à jour du système (`apt update && apt upgrade`)
+2. Installation des prérequis (Python, pip, git, curl, etc.)
+3. Installation d'Ansible
+4. Installation des collections Ansible
+5. Installation de Docker
+6. Configuration des permissions
+7. Ajout de l'utilisateur au groupe docker
+8. **Exécution directe des playbooks Ansible** (sans script intermédiaire)
 
-## 📋 Pourquoi `deploy.sh` ?
+### Résultat
 
-`deploy.sh` est un **wrapper** qui simplifie l'utilisation d'Ansible. Il automatise plusieurs étapes :
+Après l'exécution :
+- ✅ PhishGuard est installé
+- ✅ PhishGuard est configuré
+- ✅ PhishGuard est déployé
+- ✅ Services démarrés (PostgreSQL, Backend, Frontend)
+- ✅ Migrations exécutées
+- ✅ Prêt à l'emploi
 
-### Ce que fait `deploy.sh` automatiquement :
+**Accès :**
+- Frontend: http://localhost:3000
+- Backend: http://localhost:3001
+- Health: http://localhost:3001/health
 
-1. ✅ **Vérifie qu'Ansible est installé** - Évite les erreurs
-2. ✅ **Installe les collections Ansible** - `ansible-galaxy collection install`
-3. ✅ **Sélectionne le bon inventaire** - Selon l'environnement (local/staging/production)
-4. ✅ **Construit la commande complète** - Avec tous les paramètres nécessaires
-5. ✅ **Ajoute une confirmation** - Pour la production (sécurité)
-6. ✅ **Valide les paramètres** - Évite les erreurs de frappe
+## 📋 Installation Manuelle (Alternative)
 
-### Comparaison
-
-**Sans `deploy.sh` (commande Ansible complète) :**
-```bash
-cd ansible
-ansible-galaxy collection install -r requirements.yml
-ansible-playbook -i inventory/hosts.local.yml playbooks/deploy.yml
-```
-
-**Avec `deploy.sh` (une seule commande) :**
-```bash
-./deploy.sh local
-```
-
-**Avantages :**
-- ✅ Plus simple à retenir
-- ✅ Moins d'erreurs de frappe
-- ✅ Gestion automatique des chemins
-- ✅ Confirmation automatique pour production
-- ✅ Messages d'erreur clairs
-
-## 📋 Commandes
+Si vous préférez installer manuellement :
 
 ```bash
-# Déploiement
-./deploy.sh local deploy
-./deploy.sh staging deploy
-./deploy.sh production deploy
+# 1. Mettre à jour le système
+sudo apt update && sudo apt upgrade -y
 
-# Mise à jour
-./deploy.sh production update
+# 2. Installer Python et pip
+sudo apt install -y python3 python3-pip git curl
 
-# Sauvegarde
-./deploy.sh production backup
+# 3. Installer Ansible
+pip3 install ansible
+
+# 4. Rendre le script exécutable
+chmod +x install.sh
+
+# 5. Déployer (le script exécute directement Ansible)
+sudo ./install.sh local deploy
 ```
-
-## 🔧 Utilisation Directe d'Ansible (Optionnel)
-
-Si vous préférez utiliser Ansible directement (sans wrapper) :
-
-```bash
-# Installer collections
-cd ansible
-ansible-galaxy collection install -r requirements.yml
-
-# Déployer local
-ansible-playbook -i inventory/hosts.local.yml playbooks/deploy.yml
-
-# Déployer production
-ansible-playbook -i inventory/hosts.yml --limit production playbooks/deploy.yml
-
-# Mise à jour
-ansible-playbook -i inventory/hosts.yml --limit production playbooks/update.yml
-
-# Sauvegarde
-ansible-playbook -i inventory/hosts.yml --limit production playbooks/backup.yml
-```
-
-**Note :** Le wrapper `deploy.sh` fait exactement la même chose, mais de manière plus simple.
 
 ## 🔧 Configuration
 
-### 1. Inventaire (`ansible/inventory/hosts.yml`)
+### Inventaire Local
+
+Le fichier `ansible/inventory/hosts.local.yml` est déjà configuré pour un déploiement local.
+
+### Inventaire Production
+
+Éditez `ansible/inventory/hosts.yml` :
 
 ```yaml
 production:
   hosts:
     phishguard-prod:
       ansible_host: votre-serveur.com
-      ansible_user: root
+      ansible_user: ubuntu
       frontend_url: https://phishguard.com
       api_base_url: https://api.phishguard.com
       git_repo: https://github.com/votre-repo/phishguard.git
 ```
 
-### 2. Secrets (Optionnel)
+### Secrets
 
-Les secrets sont générés automatiquement. Pour les personnaliser :
+Les secrets sont générés automatiquement. Pour les personnaliser, ajoutez dans l'inventaire :
 
 ```yaml
 vars:
@@ -122,89 +93,141 @@ vars:
   tracking_enc_key: "votre_cle_tracking"
 ```
 
-### 3. Ansible Vault (Recommandé)
+## 🛠️ Commandes de Déploiement
+
+### Déploiement
 
 ```bash
-ansible-vault create ansible/group_vars/production/vault.yml
+# Local (installation complète + déploiement)
+sudo ./install.sh local
+
+# Staging (installation complète + déploiement)
+sudo ./install.sh staging
+
+# Production (installation complète + déploiement)
+sudo ./install.sh production
+```
+
+### Mise à Jour
+
+```bash
+# Mise à jour (Ansible déjà installé)
+./install.sh production update
+```
+
+### Sauvegarde
+
+```bash
+# Sauvegarde (Ansible déjà installé)
+./install.sh production backup
 ```
 
 ## 🎯 Ce Que Fait Le Déploiement
 
-1. ✅ Installe Docker automatiquement
-2. ✅ Crée utilisateur et répertoires
-3. ✅ Clone/mise à jour du code
-4. ✅ Génère secrets automatiquement
-5. ✅ Configure tous les .env
-6. ✅ Construit images Docker
-7. ✅ Démarre services (PostgreSQL, Backend, Frontend)
-8. ✅ Exécute migrations Prisma
-9. ✅ Vérifie santé des services
+Le playbook Ansible `deploy.yml` exécute automatiquement :
 
-## 📁 Structure
-
-```
-phishguard/
-├── deploy.sh              # Wrapper Ansible (simplifie l'utilisation)
-├── docker-compose.yml     # Configuration Docker
-├── ansible/
-│   ├── playbooks/         # deploy.yml, update.yml, backup.yml
-│   ├── inventory/         # Configuration serveurs
-│   └── templates/         # Templates .env
-└── apps/
-    ├── backend/
-    └── frontend/
-```
+1. ✅ Vérifie les prérequis système
+2. ✅ Installe Docker (si nécessaire)
+3. ✅ Crée utilisateur et répertoires
+4. ✅ Clone/mise à jour du code
+5. ✅ Génère secrets automatiquement
+6. ✅ Configure tous les fichiers .env
+7. ✅ Construit images Docker
+8. ✅ Démarre services (PostgreSQL, Backend, Frontend)
+9. ✅ Exécute migrations Prisma
+10. ✅ Vérifie santé des services
 
 ## 🔐 Sécurité
 
-### SSH
+### Permissions Docker
+
+Après l'installation, si vous obtenez une erreur de permission :
 
 ```bash
-ssh-keygen -t ed25519
-ssh-copy-id user@serveur.com
+# Ajouter utilisateur au groupe docker
+sudo usermod -aG docker $USER
+
+# Activer le groupe (ou se reconnecter)
+newgrp docker
+
+# Vérifier
+docker ps
 ```
 
-### Firewall
+### Firewall (UFW)
 
-Ports nécessaires :
-- **3000** : Frontend
-- **3001** : Backend
-- **5432** : PostgreSQL (interne)
+```bash
+# Activer UFW
+sudo ufw enable
 
-### HTTPS
+# Autoriser les ports
+sudo ufw allow 22/tcp    # SSH
+sudo ufw allow 3000/tcp  # Frontend
+sudo ufw allow 3001/tcp  # Backend
+```
 
-Utilisez nginx/traefik comme reverse proxy.
+### HTTPS (Production)
+
+```bash
+# Installer Nginx et Certbot
+sudo apt install nginx certbot python3-certbot-nginx
+
+# Configuration automatique
+sudo certbot --nginx -d phishguard.com
+```
 
 ## 🐛 Dépannage
 
-### Vérifier connexion
+### Vérifier les services
 
 ```bash
-ansible all -i ansible/inventory/hosts.yml -m ping
+# Conteneurs
+docker ps
+
+# Logs
+docker compose logs -f
+
+# Santé
+curl http://localhost:3001/health
 ```
 
-### Logs détaillés
+### Problèmes courants
 
+**Docker ne démarre pas :**
+```bash
+sudo systemctl status docker
+sudo systemctl restart docker
+sudo systemctl enable docker
+```
+
+**Permissions Docker :**
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+**Logs détaillés Ansible :**
 ```bash
 ansible-playbook -i ansible/inventory/hosts.yml \
   ansible/playbooks/deploy.yml -vvv
 ```
 
-### Vérifier services
+## 🚢 Déploiement Cloud
 
-```bash
-docker ps
-docker compose logs -f
-curl http://localhost:3001/health
-```
+### AWS EC2
 
-## 🔄 Workflow
+1. Créer instance EC2 (Ubuntu 22.04+)
+2. Configurer Security Group (ports 22, 3000, 3001)
+3. Configurer `ansible/inventory/hosts.yml`
+4. `sudo ./install.sh production`
 
-1. **Local** : `./deploy.sh local deploy`
-2. **Staging** : `./deploy.sh staging deploy`
-3. **Production** : `./deploy.sh production deploy`
-4. **Mise à jour** : `./deploy.sh production update`
-5. **Sauvegarde** : `./deploy.sh production backup`
+### DigitalOcean / OVH / Scaleway
+
+Même processus :
+1. Créer instance (Ubuntu)
+2. Configurer firewall
+3. Configurer inventaire
+4. `sudo ./install.sh production`
 
 ## 📊 Monitoring
 
@@ -212,47 +235,30 @@ curl http://localhost:3001/health
 # Health check
 curl http://localhost:3001/health
 
-# Logs
+# Logs en temps réel
 docker compose logs -f
 
-# Métriques
+# Métriques Docker
 docker stats
+
+# Espace disque
+df -h
+docker system df
 ```
-
-## 🚢 Cloud
-
-### AWS EC2 / DigitalOcean / OVH
-
-1. Créer instance (Ubuntu 22.04)
-2. Configurer firewall (ports 3000, 3001, 22)
-3. Configurer `ansible/inventory/hosts.yml`
-4. `./deploy.sh production deploy`
 
 ## 📝 Checklist
 
-- [ ] Ansible installé
-- [ ] Inventaire configuré
-- [ ] Accès SSH au serveur
-- [ ] Firewall configuré
+- [ ] Ubuntu 22.04+ installé
+- [ ] Accès root/sudo
+- [ ] Internet disponible
+- [ ] Inventaire configuré (production)
+- [ ] Accès SSH au serveur (production)
+- [ ] Firewall configuré (production)
 - [ ] DNS configuré (production)
 - [ ] SSL/TLS configuré (production)
 
-## 🆘 Support
-
-**Problème ?**
-
-1. Logs : `docker compose logs`
-2. Santé : `curl http://localhost:3001/health`
-3. Connexion : `ansible all -m ping`
-4. Verbose : `ansible-playbook ... -vvv`
-
 ---
 
-## 💡 Résumé
+**UNE SEULE COMMANDE : `sudo ./install.sh local`** 🚀
 
-**`deploy.sh` = Wrapper qui simplifie Ansible**
-
-- **Sans wrapper** : 3-4 commandes à retenir
-- **Avec wrapper** : 1 commande simple
-
-**Une seule commande : `./deploy.sh production deploy`** 🚀
+Le script `install.sh` exécute directement les playbooks Ansible, sans script intermédiaire.

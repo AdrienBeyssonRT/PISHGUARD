@@ -45,5 +45,10 @@ export class CampaignsController {
       take ? parseInt(take) : 50,
     );
   }
+
+  @Post(':id/launch')
+  async launch(@Req() req: AuthRequest, @Param('id') id: string) {
+    return this.campaignsService.launch(req.user.organizationId, parseInt(id));
+  }
 }
 
