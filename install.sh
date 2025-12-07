@@ -178,7 +178,12 @@ fi
 
 echo ""
 echo "👤 Étape 7/7 : Configuration de l'utilisateur $ORIGINAL_USER..."
-usermod -aG docker $ORIGINAL_USER
+# Si on est root, pas besoin d'ajouter au groupe docker
+if [ "$ORIGINAL_USER" != "root" ]; then
+    usermod -aG docker $ORIGINAL_USER
+else
+    echo "✅ Utilisateur root (déjà dans le groupe docker)"
+fi
 
 echo ""
 echo "✅ Installation terminée !"
@@ -200,24 +205,36 @@ if [ -n "$LIMIT" ]; then
 fi
 ANSIBLE_CMD="$ANSIBLE_CMD -e ansible_user=$ORIGINAL_USER -e app_user=$ORIGINAL_USER $PLAYBOOK"
 
-# Exécuter en tant qu'utilisateur original avec le groupe docker
-if sudo -u $ORIGINAL_USER sg docker -c "cd '$CURRENT_DIR' && $ANSIBLE_CMD" 2>/dev/null; then
-    echo "✅ Déploiement réussi"
-elif sudo -u $ORIGINAL_USER bash -c "cd '$CURRENT_DIR' && $ANSIBLE_CMD" 2>/dev/null; then
-    echo "✅ Déploiement réussi"
-else
-    # Dernière tentative : exécuter directement (peut fonctionner si déjà dans le groupe docker)
-    if bash -c "cd '$CURRENT_DIR' && $ANSIBLE_CMD" 2>/dev/null; then
+# Exécuter Ansible
+# Si on est root, exécuter directement
+if [ "$ORIGINAL_USER" = "root" ]; then
+    echo "📦 Exécution en tant que root..."
+    if bash -c "cd '$CURRENT_DIR' && $ANSIBLE_CMD"; then
         echo "✅ Déploiement réussi"
     else
-        echo ""
-        echo "⚠️  Le déploiement nécessite que le groupe docker soit actif."
-        echo "   Exécutez manuellement :"
-        echo "   newgrp docker"
-        echo "   sudo ./install.sh $ENV $ACTION"
-        echo ""
-        echo "   Ou reconnectez-vous pour que le groupe docker soit actif."
+        echo "❌ Erreur lors du déploiement"
         exit 1
+    fi
+else
+    # Exécuter en tant qu'utilisateur original avec le groupe docker
+    if sudo -u $ORIGINAL_USER sg docker -c "cd '$CURRENT_DIR' && $ANSIBLE_CMD" 2>/dev/null; then
+        echo "✅ Déploiement réussi"
+    elif sudo -u $ORIGINAL_USER bash -c "cd '$CURRENT_DIR' && $ANSIBLE_CMD" 2>/dev/null; then
+        echo "✅ Déploiement réussi"
+    else
+        # Dernière tentative : exécuter directement (peut fonctionner si déjà dans le groupe docker)
+        if bash -c "cd '$CURRENT_DIR' && $ANSIBLE_CMD" 2>/dev/null; then
+            echo "✅ Déploiement réussi"
+        else
+            echo ""
+            echo "⚠️  Le déploiement nécessite que le groupe docker soit actif."
+            echo "   Exécutez manuellement :"
+            echo "   newgrp docker"
+            echo "   sudo ./install.sh $ENV $ACTION"
+            echo ""
+            echo "   Ou reconnectez-vous pour que le groupe docker soit actif."
+            exit 1
+        fi
     fi
 fi
 
