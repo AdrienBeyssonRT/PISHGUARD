@@ -89,3 +89,4 @@ jobs:
       env:
         DATABASE_URL: postgresql://phishguard:phishguard_password@localhost:5432/phishguard?schema=public
 
+

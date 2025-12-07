@@ -59,8 +59,10 @@ fi
 
 # Si c'est update ou backup, vérifier Ansible et exécuter
 if [ "$ACTION" != "deploy" ]; then
+    # Vérifier ansible-playbook dans le PATH standard et pipx
+    export PATH="$PATH:/root/.local/bin:$HOME/.local/bin"
     if ! command -v ansible-playbook >/dev/null 2>&1; then
-        echo "❌ Ansible requis: pip install ansible"
+        echo "❌ Ansible requis. Installez avec: sudo ./install.sh local"
         exit 1
     fi
     
@@ -97,22 +99,53 @@ apt install -y \
     python3 \
     python3-pip \
     python3-venv \
+    python3-full \
     git \
     curl \
     wget \
     ca-certificates \
     gnupg \
     lsb-release \
-    openssl
+    openssl \
+    pipx
 
 echo ""
 echo "📦 Étape 3/7 : Installation d'Ansible..."
-pip3 install ansible
+# Essayer d'abord avec apt (si disponible)
+if apt-cache show ansible >/dev/null 2>&1 && apt install -y ansible 2>/dev/null; then
+    echo "✅ Ansible installé via apt"
+elif command -v pipx >/dev/null 2>&1; then
+    echo "📦 Installation d'Ansible via pipx..."
+    pipx install ansible
+    export PATH="$PATH:/root/.local/bin"
+elif python3 -m pip install --break-system-packages ansible 2>/dev/null; then
+    echo "✅ Ansible installé via pip (--break-system-packages)"
+else
+    # Installer pipx et utiliser pipx (méthode recommandée pour Ubuntu 25.10)
+    echo "📦 Installation de pipx..."
+    apt install -y pipx
+    pipx ensurepath
+    export PATH="$PATH:/root/.local/bin"
+    pipx install ansible
+    echo "✅ Ansible installé via pipx"
+fi
+
+# Vérifier que ansible-playbook est disponible
+if ! command -v ansible-playbook >/dev/null 2>&1; then
+    # Essayer de trouver ansible-playbook dans le PATH étendu
+    export PATH="$PATH:/root/.local/bin"
+    if ! command -v ansible-playbook >/dev/null 2>&1; then
+        echo "❌ Erreur: ansible-playbook non trouvé après installation"
+        exit 1
+    fi
+fi
 
 echo ""
 echo "📦 Étape 4/7 : Installation des collections Ansible..."
 cd "$CURRENT_DIR/ansible"
-sudo -u $ORIGINAL_USER ansible-galaxy collection install -r requirements.yml -q 2>/dev/null || true
+# S'assurer que le PATH inclut pipx si nécessaire
+export PATH="$PATH:/root/.local/bin"
+ansible-galaxy collection install -r requirements.yml -q 2>/dev/null || true
 cd "$CURRENT_DIR"
 
 echo ""
@@ -152,6 +185,9 @@ echo ""
 # Exécuter Ansible directement
 echo "📦 Exécution du playbook Ansible..."
 cd "$CURRENT_DIR"
+
+# S'assurer que le PATH inclut pipx si nécessaire
+export PATH="$PATH:/root/.local/bin"
 
 # Construire la commande Ansible
 ANSIBLE_CMD="ansible-playbook -i $INVENTORY"
