@@ -1,0 +1,22 @@
+---
+# Variables communes à tous les environnements
+
+app_name: phishguard
+app_user: phishguard
+app_dir: /opt/phishguard
+
+# Configuration par défaut (peut être surchargée par environnement)
+database_password: "{{ vault_database_password | default('phishguard_secure_password') }}"
+jwt_secret: "{{ vault_jwt_secret | default('') }}"
+tracking_enc_key: "{{ vault_tracking_enc_key | default('') }}"
+
+# Email (optionnel)
+sendgrid_api_key: "{{ vault_sendgrid_api_key | default('') }}"
+from_email: "noreply@phishguard.com"
+
+# OAuth (optionnel)
+google_client_id: "{{ vault_google_client_id | default('') }}"
+google_client_secret: "{{ vault_google_client_secret | default('') }}"
+microsoft_client_id: "{{ vault_microsoft_client_id | default('') }}"
+microsoft_client_secret: "{{ vault_microsoft_client_secret | default('') }}"
+

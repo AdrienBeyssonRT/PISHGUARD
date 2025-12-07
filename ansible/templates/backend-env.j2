@@ -1,0 +1,30 @@
+# Configuration Backend PhishGuard
+# Généré automatiquement par Ansible
+
+# Database
+DATABASE_URL={{ database_url }}
+
+# JWT
+JWT_SECRET={{ jwt_secret }}
+JWT_EXPIRES_IN=7d
+
+# Tracking Encryption
+TRACKING_ENC_KEY={{ tracking_enc_key }}
+
+# Server
+PORT=3001
+NODE_ENV=production
+
+# CORS
+FRONTEND_URL={{ frontend_url }}
+
+# Email Provider
+SENDGRID_API_KEY={{ sendgrid_api_key | default('') }}
+FROM_EMAIL={{ from_email | default('noreply@phishguard.com') }}
+
+# OAuth
+GOOGLE_CLIENT_ID={{ google_client_id | default('') }}
+GOOGLE_CLIENT_SECRET={{ google_client_secret | default('') }}
+MICROSOFT_CLIENT_ID={{ microsoft_client_id | default('') }}
+MICROSOFT_CLIENT_SECRET={{ microsoft_client_secret | default('') }}
+

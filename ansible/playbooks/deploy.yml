@@ -1,0 +1,189 @@
+---
+- name: Déploiement PhishGuard
+  hosts: all
+  become: yes
+  vars:
+    app_name: phishguard
+    app_user: "{{ ansible_user | default('phishguard') }}"
+    app_dir: "{{ app_dir | default('/opt/phishguard') }}"
+
+  tasks:
+    - name: Vérifier OS supporté
+      assert:
+        that: ansible_os_family in ['Debian', 'RedHat']
+        fail_msg: "OS non supporté. Debian/Ubuntu ou RHEL/CentOS requis."
+
+    - name: Installer prérequis
+      package:
+        name: [curl, git, python3, python3-pip]
+        state: present
+
+    - name: Vérifier Docker
+      command: docker --version
+      register: docker_check
+      changed_when: false
+      failed_when: false
+
+    - name: Installer Docker (Debian/Ubuntu)
+      block:
+        - name: Ajouter clé GPG
+          apt_key:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            state: present
+        - name: Ajouter repository
+          apt_repository:
+            repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+            state: present
+        - name: Installer Docker
+          apt:
+            name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+            state: present
+            update_cache: yes
+      when:
+        - docker_check.rc != 0
+        - ansible_os_family == "Debian"
+
+    - name: Installer Docker (RHEL/CentOS)
+      yum:
+        name: [docker, docker-compose]
+        state: present
+      when:
+        - docker_check.rc != 0
+        - ansible_os_family == "RedHat"
+
+    - name: Démarrer Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Créer utilisateur
+      user:
+        name: "{{ app_user }}"
+        system: yes
+        shell: /bin/bash
+        groups: docker
+        append: yes
+      when: app_user != "root" and app_user != ansible_user
+
+    - name: Créer répertoire
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+
+    - name: Copier docker-compose.yml (local)
+      copy:
+        src: "{{ playbook_dir }}/../../docker-compose.yml"
+        dest: "{{ app_dir }}/docker-compose.yml"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+      when: git_repo is not defined
+
+    - name: Cloner repository
+      git:
+        repo: "{{ git_repo }}"
+        dest: "{{ app_dir }}"
+        version: "{{ git_branch | default('main') }}"
+        update: yes
+      become_user: "{{ app_user }}"
+      when: git_repo is defined
+
+    - name: Générer JWT secret
+      command: openssl rand -hex 32
+      register: jwt_secret_gen
+      changed_when: false
+      when: jwt_secret is not defined
+
+    - name: Générer tracking key
+      command: openssl rand -hex 32
+      register: tracking_key_gen
+      changed_when: false
+      when: tracking_enc_key is not defined
+
+    - name: Générer database password
+      command: openssl rand -hex 16
+      register: db_password_gen
+      changed_when: false
+      when: database_password is not defined
+
+    - name: Définir secrets
+      set_fact:
+        jwt_secret: "{{ jwt_secret | default(jwt_secret_gen.stdout) }}"
+        tracking_key: "{{ tracking_enc_key | default(tracking_key_gen.stdout) }}"
+        db_password: "{{ database_password | default(db_password_gen.stdout) }}"
+
+    - name: Créer .env Docker
+      template:
+        src: "{{ playbook_dir }}/../templates/env.j2"
+        dest: "{{ app_dir }}/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0600'
+      vars:
+        jwt_secret: "{{ jwt_secret }}"
+        tracking_enc_key: "{{ tracking_key }}"
+        database_password: "{{ db_password }}"
+        frontend_url: "{{ frontend_url | default('http://' + ansible_default_ipv4.address + ':3000') }}"
+
+    - name: Créer .env backend
+      template:
+        src: "{{ playbook_dir }}/../templates/backend-env.j2"
+        dest: "{{ app_dir }}/apps/backend/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0600'
+      vars:
+        database_url: "postgresql://phishguard:{{ db_password }}@postgres:5432/phishguard?schema=public"
+        jwt_secret: "{{ jwt_secret }}"
+        tracking_enc_key: "{{ tracking_key }}"
+        frontend_url: "{{ frontend_url | default('http://' + ansible_default_ipv4.address + ':3000') }}"
+
+    - name: Créer .env.local frontend
+      template:
+        src: "{{ playbook_dir }}/../templates/frontend-env.j2"
+        dest: "{{ app_dir }}/apps/frontend/.env.local"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0600'
+      vars:
+        api_base_url: "{{ api_base_url | default('http://' + ansible_default_ipv4.address + ':3001') }}"
+
+    - name: Construire et démarrer
+      shell: |
+        cd {{ app_dir }}
+        docker compose up -d --build
+      become_user: "{{ app_user }}"
+
+    - name: Attendre services
+      wait_for:
+        port: "{{ item }}"
+        host: localhost
+        delay: 5
+        timeout: 30
+      loop: [5432, 3001]
+
+    - name: Exécuter migrations
+      shell: |
+        cd {{ app_dir }}
+        docker compose exec -T backend sh -c "cd apps/backend && npx prisma migrate deploy"
+      become_user: "{{ app_user }}"
+      retries: 3
+      delay: 5
+
+    - name: Vérifier santé
+      uri:
+        url: "{{ api_base_url | default('http://localhost:3001') }}/health"
+        method: GET
+        status_code: 200
+      retries: 5
+      delay: 5
+
+    - name: Résultat
+      debug:
+        msg:
+          - "✅ Déploiement réussi"
+          - "Frontend: {{ frontend_url | default('http://' + ansible_default_ipv4.address + ':3000') }}"
+          - "Backend: {{ api_base_url | default('http://' + ansible_default_ipv4.address + ':3001') }}"

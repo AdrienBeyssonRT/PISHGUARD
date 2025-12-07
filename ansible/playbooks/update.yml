@@ -1,0 +1,45 @@
+---
+- name: Mise à jour PhishGuard
+  hosts: all
+  become: yes
+  vars:
+    app_dir: "{{ app_dir | default('/opt/phishguard') }}"
+    app_user: "{{ app_user | default('phishguard') }}"
+
+  tasks:
+    - name: Mettre à jour code
+      git:
+        repo: "{{ git_repo }}"
+        dest: "{{ app_dir }}"
+        version: "{{ git_branch | default('main') }}"
+        update: yes
+      become_user: "{{ app_user }}"
+      when: git_repo is defined
+
+    - name: Reconstruire et redémarrer
+      shell: |
+        cd {{ app_dir }}
+        docker compose pull
+        docker compose build --no-cache
+        docker compose up -d
+      become_user: "{{ app_user }}"
+
+    - name: Exécuter migrations
+      shell: |
+        cd {{ app_dir }}
+        docker compose exec -T backend sh -c "cd apps/backend && npx prisma migrate deploy"
+      become_user: "{{ app_user }}"
+      retries: 3
+      delay: 5
+
+    - name: Vérifier santé
+      uri:
+        url: "{{ api_base_url | default('http://localhost:3001') }}/health"
+        method: GET
+        status_code: 200
+      retries: 5
+      delay: 5
+
+    - name: Résultat
+      debug:
+        msg: "✅ Mise à jour terminée"

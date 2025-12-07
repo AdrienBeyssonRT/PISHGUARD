@@ -1,0 +1,42 @@
+---
+- name: Sauvegarde PhishGuard
+  hosts: all
+  become: yes
+  vars:
+    app_dir: "{{ app_dir | default('/opt/phishguard') }}"
+    app_user: "{{ app_user | default('phishguard') }}"
+    backup_dir: "{{ app_dir }}/backups"
+    retention_days: 7
+
+  tasks:
+    - name: Créer répertoire sauvegarde
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+
+    - name: Sauvegarder base de données
+      shell: |
+        cd {{ app_dir }}
+        docker compose exec -T postgres pg_dump -U phishguard phishguard | gzip > {{ backup_dir }}/phishguard_{{ ansible_date_time.epoch }}.sql.gz
+      become_user: "{{ app_user }}"
+
+    - name: Nettoyer anciennes sauvegardes
+      find:
+        paths: "{{ backup_dir }}"
+        patterns: "phishguard_*.sql.gz"
+        age: "+{{ retention_days }}d"
+      register: old_backups
+
+    - name: Supprimer anciennes sauvegardes
+      file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_backups.files }}"
+      when: old_backups.matched > 0
+
+    - name: Résultat
+      debug:
+        msg: "✅ Sauvegarde: {{ backup_dir }}/phishguard_{{ ansible_date_time.epoch }}.sql.gz"

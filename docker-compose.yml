@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: phishguard-db
+    environment:
+      POSTGRES_USER: phishguard
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-phishguard_password}
+      POSTGRES_DB: phishguard
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phishguard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - phishguard-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: phishguard-backend
+    environment:
+      DATABASE_URL: postgresql://phishguard:${DATABASE_PASSWORD:-phishguard_password}@postgres:5432/phishguard?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      TRACKING_ENC_KEY: ${TRACKING_ENC_KEY}
+      PORT: 3001
+      NODE_ENV: production
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - phishguard-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: phishguard-frontend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3001}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - phishguard-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  phishguard-network:
+    driver: bridge
