@@ -4,10 +4,13 @@
   become: yes
   vars:
     app_name: phishguard
-    app_user: "{{ ansible_user | default('phishguard') }}"
-    app_dir: "{{ app_dir | default('/opt/phishguard') }}"
+    app_user: "{{ app_user | default(ansible_user | default('phishguard')) }}"
+    # app_dir sera défini via set_fact pour éviter la boucle récursive
 
   tasks:
+    - name: Définir app_dir
+      set_fact:
+        app_dir: "{{ app_dir | default('/opt/phishguard') }}"
     - name: Vérifier OS supporté
       assert:
         that: ansible_os_family in ['Debian', 'RedHat']
